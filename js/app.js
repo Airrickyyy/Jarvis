@@ -1,9 +1,4 @@
-import {
-  CLAP_AUDIO_THRESHOLD_BASE,
-  WAKE_PHRASE_REGEX,
-  WAKE_PHRASE_WINDOW_MS,
-} from "./constants.js";
-import { createClapDetector } from "./clapDetector.js";
+import { WAKE_PHRASE_REGEX } from "./constants.js";
 import {
   relayJsonToButtonParse,
 } from "./commandParser.js";
@@ -18,7 +13,6 @@ import {
 const States = /** @type {const} */ ({
   STANDBY: "standby",
   LISTENING: "listening",
-  ARMED_WAKEUP: "armed_wakeup",
   SPEAKING: "speaking",
   ACTIVE: "active_ai",
 });
@@ -51,10 +45,6 @@ let wakeHandshakePending = false;
 let audioCtx = /** @type {AudioContext | null} */ (null);
 /** @type {MediaStream | null} */
 let mediaStream = null;
-const clapper = createClapDetector({ onDoubleClap: handleDoubleClap });
-
-let armTimerId = null;
-let armDeadlineTs = 0;
 
 let lastUtteranceFp = "";
 let lastUtteranceTs = 0;
@@ -79,10 +69,8 @@ function setState(next) {
     dotExtra = "bg-emerald-400 text-emerald-400";
   } else if (next === States.SPEAKING) {
     dotExtra = "bg-amber-400 text-amber-400";
-  } else if (next === States.ARMED_WAKEUP) {
-    dotExtra = "bg-indigo-400 text-indigo-400";
   } else if (next === States.LISTENING) {
-    dotExtra = "bg-slate-300 text-slate-300";
+    dotExtra = "bg-indigo-400 text-indigo-400";
   } else {
     dotExtra = "bg-slate-500 text-slate-500";
   }
@@ -90,8 +78,7 @@ function setState(next) {
 
   const map = {
     [States.STANDBY]: "Standby",
-    [States.LISTENING]: "Clap‑wait",
-    [States.ARMED_WAKEUP]: "Wake phrase",
+    [States.LISTENING]: "Wake phrase",
     [States.SPEAKING]: "Jarvis Speaking",
     [States.ACTIVE]: "Jarvis Active",
   };
@@ -103,12 +90,9 @@ function setState(next) {
   } else if (next === States.SPEAKING) {
     hintTextEl.textContent =
       "Speech capture paused — avoid feedback while ElevenLabs / fallback audio plays.";
-  } else if (next === States.ARMED_WAKEUP) {
-    hintTextEl.textContent = `Articulate “wake up” (${Math.round(
-      WAKE_PHRASE_WINDOW_MS / 1000
-    )}s window • another double-clap refreshes)`;
   } else if (next === States.LISTENING) {
-    hintTextEl.textContent = `Double-clap (${CLAP_AUDIO_THRESHOLD_BASE} RMS base) unlocks Jarvis handshake.`;
+    hintTextEl.textContent =
+      "Voice wake enabled — say “wake up jarvis” to activate conversation mode.";
   } else {
     hintTextEl.textContent = "Engines cold — press Start.";
   }
@@ -132,13 +116,6 @@ function refreshButtonsUi() {
   });
 }
 
-function clearArmTimer() {
-  if (armTimerId !== null) {
-    clearTimeout(armTimerId);
-    armTimerId = null;
-  }
-}
-
 function resetSessionFlags() {
   lastUtteranceFp = "";
   lastUtteranceTs = 0;
@@ -147,8 +124,6 @@ function resetSessionFlags() {
 }
 
 async function teardownSession() {
-  clearArmTimer();
-  clapper.stop();
   recognition.stop();
   chatTurns = [];
   resetSessionFlags();
@@ -181,10 +156,8 @@ async function initialiseAudioStack() {
 
   audioCtx = new AudioContext({ latencyHint: "interactive" });
   await audioCtx.resume();
-  clapper.start(audioCtx, mediaStream);
 
-  subtitleEl.textContent =
-    "Thermal sensors calibrated. Awaiting double‑clap to arm conversational core.";
+  subtitleEl.textContent = "Microphone online. Say “wake up jarvis” when ready.";
 }
 
 const recognition = createRecognitionSession({
@@ -211,32 +184,16 @@ const recognition = createRecognitionSession({
 
 refreshButtonsUi();
 
-function handleDoubleClap() {
-  if (appState === States.ACTIVE || appState === States.SPEAKING) return;
-
-  recognition.restartFresh();
-  clearArmTimer();
-  armDeadlineTs = Date.now() + WAKE_PHRASE_WINDOW_MS;
-
-  armTimerId = window.setTimeout(() => {
-    if (appState !== States.ARMED_WAKEUP) return;
-    setState(States.LISTENING);
-    subtitleEl.textContent =
-      "Wake window expired — kindly double‑clap to re‑arm Jarvis.";
-  }, WAKE_PHRASE_WINDOW_MS);
-
-  setState(States.ARMED_WAKEUP);
-  subtitleEl.textContent = "Hands free — deliver the wake passphrase.";
-}
-
 /**
  * Router for speech aggregator.
  */
 function handleSpeechRollup({ fullPhrase, deltaFinalsJoined }) {
-  if (appState === States.ARMED_WAKEUP) {
-    if (Date.now() > armDeadlineTs) return;
+  if (appState === States.LISTENING) {
     const phrase = `${fullPhrase}`.trim();
-    if (phrase.length && WAKE_PHRASE_REGEX.test(phrase)) void completeWakeHandshake();
+    const wakeUpJarvis = /\bwake\s*(up)?\s*jarvis\b/i.test(phrase);
+    if (wakeUpJarvis || (phrase.length && WAKE_PHRASE_REGEX.test(phrase))) {
+      void completeWakeHandshake();
+    }
     return;
   }
 
@@ -386,7 +343,6 @@ async function orchestrateAiExchange(chunk) {
 }
 
 function finalizeStandDown() {
-  clearArmTimer();
   chatTurns = [];
   lastUtteranceFp = "";
 
@@ -397,7 +353,7 @@ function finalizeStandDown() {
 
   setState(States.LISTENING);
   subtitleEl.textContent =
-    "Standing by for double‑clap re‑arm whenever you desire, Sir.";
+    "Standing by for voice wake command. Say “wake up jarvis” when you are ready, Sir.";
   try {
     recognition.restartFresh();
   } catch {
@@ -407,10 +363,9 @@ function finalizeStandDown() {
 
 async function completeWakeHandshake() {
   if (wakeHandshakePending) return;
-  if (appState !== States.ARMED_WAKEUP) return;
+  if (appState !== States.LISTENING) return;
   wakeHandshakePending = true;
 
-  clearArmTimer();
   setState(States.SPEAKING);
   recognition.stop();
 
@@ -478,7 +433,7 @@ async function bootstrapFromUserGesture() {
       await teardownSession();
       setState(States.STANDBY);
       subtitleEl.textContent =
-        "Press Start to resume — double‑clap, wake phrase, then conversational relay governance.";
+        "Press Start to resume — then say “wake up jarvis” to activate conversational relay governance.";
       startBtn.disabled = false;
       startBtn.textContent = "Start Jarvis mic";
       refreshButtonsUi();
