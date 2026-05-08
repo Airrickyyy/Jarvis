@@ -1,9 +1,4 @@
-import {
-  CLAP_AUDIO_THRESHOLD_BASE,
-  WAKE_PHRASE_REGEX,
-  WAKE_PHRASE_WINDOW_MS,
-} from "./constants.js";
-import { createClapDetector } from "./clapDetector.js";
+import { WAKE_PHRASE_REGEX } from "./constants.js";
 import {
   parseButtonCommand,
   formatConfirmation,
@@ -17,7 +12,6 @@ import {
 const States = /** @type {const} */ ({
   STANDBY: "standby",
   LISTENING: "listening",
-  ARMED_WAKEUP: "armed_wakeup",
   SPEAKING: "speaking",
   ACTIVE: "active_commands",
 });
@@ -45,15 +39,6 @@ let appState = States.STANDBY;
 /** Prevents overlapping wake completions if transcripts repeat. */
 let wakeHandshakePending = false;
 
-let audioContext = null;
-/** @type {MediaStream | null} */
-let mediaStream = null;
-let clapper = createClapDetector({ onDoubleClap: handleDoubleClap });
-
-let armTimerId = null;
-/** @type {number} */
-let armDeadlineTs = 0;
-
 /** Dedupe repeated parses of the same final chunk */
 /** @type {string} */
 let lastCommandFingerprint = "";
@@ -67,12 +52,10 @@ function setState(next) {
   let dotExtra = "";
   if (next === States.ACTIVE) {
     dotExtra = "bg-emerald-400 text-emerald-400";
-  } else if (next === States.ARMED_WAKEUP) {
-    dotExtra = "bg-indigo-400 text-indigo-400";
   } else if (next === States.SPEAKING) {
     dotExtra = "bg-amber-400 text-amber-400";
   } else if (next === States.LISTENING) {
-    dotExtra = "bg-slate-400 text-slate-400";
+    dotExtra = "bg-indigo-400 text-indigo-400";
   } else {
     dotExtra = "bg-slate-500 text-slate-500";
   }
@@ -81,7 +64,6 @@ function setState(next) {
   const map = {
     [States.STANDBY]: "Standby",
     [States.LISTENING]: "Listening",
-    [States.ARMED_WAKEUP]: "Wake phrase",
     [States.SPEAKING]: "Initialising…",
     [States.ACTIVE]: "Jarvis Active",
   };
@@ -89,26 +71,16 @@ function setState(next) {
 
   if (next === States.ACTIVE) {
     hintTextEl.textContent =
-      `Voice — try “Enable button A”, “Turn on B and D”, “Activate all buttons”. Threshold base ≈ ${CLAP_AUDIO_THRESHOLD_BASE}.`;
-  } else if (next === States.ARMED_WAKEUP) {
-    hintTextEl.textContent = `Say clearly: “wake up”. Window ${Math.round(
-      WAKE_PHRASE_WINDOW_MS / 1000
-    )}s — double-clap resets this timer.`;
+      "Voice — try “Enable button A”, “Turn on B and D”, “Activate all buttons”.";
   } else if (next === States.SPEAKING) {
     hintTextEl.textContent =
       "Speech recognition muted briefly while briefing audio plays.";
   } else if (next === States.LISTENING) {
-    hintTextEl.textContent = `Listening for double-clap handshake (Audio API, threshold base ${CLAP_AUDIO_THRESHOLD_BASE}).`;
+    hintTextEl.textContent =
+      "Listening for wake phrase — say clearly “wake up” before relay commands.";
   } else {
     hintTextEl.textContent =
-      "Mic offline. Start the system when you are ready to arm audio.";
-  }
-}
-
-function clearArmTimer() {
-  if (armTimerId !== null) {
-    clearTimeout(armTimerId);
-    armTimerId = null;
+      "Mic offline. Start the system when you are ready.";
   }
 }
 
@@ -131,42 +103,15 @@ function refreshButtonsUi() {
   });
 }
 
-async function teardownAudio() {
-  clearArmTimer();
-  clapper.stop();
+async function teardownSession() {
   recognition.stop();
-
-  if (audioContext) {
-    await audioContext.close();
-    audioContext = null;
-  }
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => t.stop());
-    mediaStream = null;
-  }
-
   resetEngineFlags();
 }
 
 function resetEngineFlags() {
-  armDeadlineTs = 0;
   lastCommandFingerprint = "";
   lastCommandTime = 0;
   wakeHandshakePending = false;
-}
-
-async function initialiseAudioStack() {
-  mediaStream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: false,
-  });
-
-  audioContext = new AudioContext();
-  await audioContext.resume();
-  clapper.start(audioContext, mediaStream);
-
-  subtitleEl.textContent =
-    "System live. Listening for handshake claps followed by wake phrase.";
 }
 
 const recognition = createRecognitionSession({
@@ -193,33 +138,12 @@ const recognition = createRecognitionSession({
 
 refreshButtonsUi();
 
-function handleDoubleClap() {
-  if (appState === States.SPEAKING || appState === States.ACTIVE) return;
-
-  recognition.restartFresh();
-  clearArmTimer();
-  armDeadlineTs = Date.now() + WAKE_PHRASE_WINDOW_MS;
-  armTimerId = window.setTimeout(() => {
-    if (appState !== States.ARMED_WAKEUP) return;
-    setState(States.LISTENING);
-    subtitleEl.textContent =
-      "Listening again. Wake window expired — double-clap once more.";
-  }, WAKE_PHRASE_WINDOW_MS);
-
-  setState(States.ARMED_WAKEUP);
-  subtitleEl.textContent =
-    "Wake sequence armed. Say distinctly: “wake up”.";
-}
-
-/**
- * Handles wake detection on rolling phrase plus command deltas when active.
- * @param {{ fullPhrase: string, deltaFinalsJoined: string }} args
- */
 function handleSpeechRollup({ fullPhrase, deltaFinalsJoined }) {
-  if (appState === States.ARMED_WAKEUP) {
-    if (Date.now() > armDeadlineTs) return;
-    if (!WAKE_PHRASE_REGEX.test(fullPhrase)) return;
-    void completeWakeHandshake();
+  if (appState === States.LISTENING) {
+    const phrase = `${fullPhrase}`.trim();
+    if (phrase.length && WAKE_PHRASE_REGEX.test(phrase)) {
+      void completeWakeHandshake();
+    }
     return;
   }
 
@@ -235,6 +159,11 @@ function handleSpeechRollup({ fullPhrase, deltaFinalsJoined }) {
   }
   lastCommandFingerprint = fp;
   lastCommandTime = nowTs;
+
+  /** Ignore commands that accidentally restate wake while active. */
+  if (WAKE_PHRASE_REGEX.test(chunk) && chunk.length < 24) {
+    return;
+  }
 
   const parsed = parseButtonCommand(chunk);
   if (!parsed) return;
@@ -269,13 +198,12 @@ function applyParseResult(parsed) {
 
 async function completeWakeHandshake() {
   if (wakeHandshakePending) return;
-  if (appState !== States.ARMED_WAKEUP) return;
+  if (appState !== States.LISTENING) return;
   wakeHandshakePending = true;
-  clearArmTimer();
   setState(States.SPEAKING);
   recognition.stop();
 
-  subtitleEl.textContent = "Wake credentials accepted. Bringing core online.";
+  subtitleEl.textContent = "Wake phrase accepted. Bringing core online.";
   try {
     await speak("Good morning, Sir,");
     setState(States.ACTIVE);
@@ -308,22 +236,22 @@ async function bootstrapFromUserGesture() {
   startBtn.textContent = "Listening…";
 
   try {
-    await initialiseAudioStack();
-    recognition.start();
+    recognition.restartFresh();
     setState(States.LISTENING);
-    speechNoteEl.textContent = "Recognition engine ready.";
+    speechNoteEl.textContent = "Recognition engine ready — allow mic if prompted.";
+    subtitleEl.textContent = "Say “wake up” when you are ready.";
     hintTextEl.textContent =
-      "Arming requires two brisk claps, then articulate “wake up”.";
+      "Wake phrase is detected from live speech; say “wake up” clearly.";
     startBtn.textContent = "Stop Jarvis mic";
     startBtn.onclick = async () => {
-      await teardownAudio();
+      await teardownSession();
       BUTTON_IDS.forEach((id) => {
         buttonOn[id] = false;
       });
       refreshButtonsUi();
       setState(States.STANDBY);
       subtitleEl.textContent =
-        'Click “Start Jarvis mic”, allow audio, complete “double clap + wake up”.';
+        'Click “Start Jarvis mic”, allow audio, then say “wake up”.';
       startBtn.disabled = false;
       startBtn.textContent = "Start Jarvis mic";
       refreshButtonsUi();
@@ -334,7 +262,7 @@ async function bootstrapFromUserGesture() {
     const code = /** @type {DOMException | Error} */ (error)?.name;
     if (!window.isSecureContext || code === "SecurityError") {
       subtitleEl.textContent =
-        'Mic blocked — open this page over http://127.0.0.1 using Serve-Local, not file://.';
+        'Blocked — open this page over http://127.0.0.1 using Serve-Local, not file://.';
       speechNoteEl.textContent =
         "Use Serve-Local.ps1 / .bat, then allow mic on the localhost page.";
       insecureWarningEl?.removeAttribute("hidden");

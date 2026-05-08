@@ -32,8 +32,7 @@
             Jarvis interface
           </h1>
           <p id="subtitle" class="mt-2 max-w-xl text-sm text-slate-400">
-            Initialise the system and complete the wake handshake: double clap, then say clearly,
-            “Wake up”.
+            Initialise the system, then wake it with voice only — say clearly, “wake up”.
           </p>
           <aside
             id="insecureWarning"
@@ -118,7 +117,8 @@
         <p id="footNote" class="text-[11px] leading-relaxed text-slate-600">
           Needs <code class="rounded bg-slate-900 px-1 text-slate-400">http://127.0.0.1</code>
           via the included server—not a plain <code class="rounded bg-slate-900 px-1 text-slate-400">file://</code>
-          URL—for reliable mic prompts. Clap RMS threshold lives in
+          URL—for reliable mic prompts. Wake phrase pattern:
+          <code class="rounded bg-slate-900 px-1 text-slate-400">WAKE_PHRASE_REGEX</code> in
           <code class="rounded bg-slate-900 px-1 text-slate-400">js/constants.js</code>. Prefer Chrome /
           Edge—mobile Safari does not expose Web SpeechRecognition.
         </p>

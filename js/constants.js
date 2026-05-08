@@ -1,6 +1,5 @@
 /**
- * Tune clap sensitivity here. RMS floor is combined with adaptive noise estimate in the detector.
- * Increase if ambient noise triggers false claps; decrease if real claps are missed.
+ * Unused by the voice-only Jarvis build; retained for experiments / clap tooling.
  */
 export const CLAP_AUDIO_THRESHOLD_BASE = 0.14;
 
@@ -17,10 +16,7 @@ export const CLAP_INITIAL_NOISE_FLOOR = 0.02;
 /** Adaptive noise smoothing (higher = slower to drift) */
 export const CLAP_NOISE_SMOOTHING = 0.98;
 
-/** After double-clap, user must say "wake up" within this window (ms). */
-export const WAKE_PHRASE_WINDOW_MS = 5000;
-
-/** Wake substring (speech tolerance). */
+/** Wake phrase (speech tolerance). */
 export const WAKE_PHRASE_REGEX = /wake\s*(up)?/i;
 
 export const RECOG_LANG = "en-US";
