@@ -32,7 +32,10 @@
             Jarvis interface
           </h1>
           <p id="subtitle" class="mt-2 max-w-xl text-sm text-slate-400">
-            Initialise the system, then wake it with voice only — say clearly, “wake up”.
+            Start the uplink → double‑clap to arm Jarvis → say “wake up” → conversation mode activates.
+            Populate <code class="rounded bg-black/35 px-1">js/credentials.js</code> (or inject
+            <code class="rounded bg-black/35 px-1">window.JARVIS_CONFIG</code>) with Groq + ElevenLabs
+            secrets before trusting the relays.
           </p>
           <aside
             id="insecureWarning"
@@ -61,15 +64,24 @@
         </div>
       </header>
 
-      <section class="rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-xl shadow-black/40 backdrop-blur-xl">
-        <div class="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <section
+        id="relayCard"
+        class="relative isolate overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/40 p-6 shadow-xl shadow-black/40 backdrop-blur-xl"
+      >
+        <span
+          id="relayGlow"
+          aria-hidden="true"
+          class="pointer-events-none absolute inset-0 z-0 rounded-2xl bg-gradient-to-br from-indigo-500/65 via-purple-600/55 to-transparent opacity-0 transition-all duration-[650ms]"
+        ></span>
+
+        <div class="relative z-10 mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
             Relay grid
           </h2>
           <p id="hintText" class="text-xs text-slate-500"></p>
         </div>
 
-        <div id="buttonGrid" class="grid grid-cols-2 gap-4">
+        <div id="buttonGrid" class="relative z-10 grid grid-cols-2 gap-4">
           <!-- Buttons default visually “off”: low emphasis -->
           <button
             id="btnA"
@@ -115,12 +127,12 @@
           Start Jarvis mic
         </button>
         <p id="footNote" class="text-[11px] leading-relaxed text-slate-600">
-          Needs <code class="rounded bg-slate-900 px-1 text-slate-400">http://127.0.0.1</code>
-          via the included server—not a plain <code class="rounded bg-slate-900 px-1 text-slate-400">file://</code>
-          URL—for reliable mic prompts. Wake phrase pattern:
-          <code class="rounded bg-slate-900 px-1 text-slate-400">WAKE_PHRASE_REGEX</code> in
-          <code class="rounded bg-slate-900 px-1 text-slate-400">js/constants.js</code>. Prefer Chrome /
-          Edge—mobile Safari does not expose Web SpeechRecognition.
+          Serve over <code class="rounded bg-slate-900 px-1 text-slate-400">https://</code> or
+          <code class="rounded bg-slate-900 px-1 text-slate-400">http://localhost</code> —
+          browsers block raw <code class="rounded bg-slate-900 px-1 text-slate-400">file://</code> mics.
+          Groq/Eleven fetches originate in‑browser (keys exposed+CORS)—use HTTPS proxies (`groqProxyUrl`,
+          etc.) once you graduate from prototypes. Prefer Chrome—the Web SpeechRecognition stack is flaky
+          elsewhere.
         </p>
       </footer>
     </div>

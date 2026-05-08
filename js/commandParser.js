@@ -133,3 +133,95 @@ function listLetters(arr) {
   const head = arr.slice(0, -1).join(", ");
   return `Buttons ${head} and ${tail}`;
 }
+
+/** @typedef {{ role: 'user' | 'assistant' | 'system', content: string }} ChatTurn */
+
+/** @typedef {{ stand_down?: boolean, all_buttons?: boolean | null, button_updates?: Partial<Record<ButtonId, boolean>>, buttons?: Partial<Record<ButtonId, boolean>>, reply?: string }} RelayShape */
+
+const RELAY_PROMPT_BODY = `
+You are "Jarvis", a meticulous British-accented tactical AI concierge for a futuristic smart dashboard.
+Maintain brevity, dry wit, and military politeness toward the user whom you refer to occasionally as Sir.
+You supervise four binary relays labelled A,B,C,D. They can be commanded on/off collectively or selectively.
+
+RULES — respond with VALID JSON ONLY (no markdown fences, no preamble):
+{
+  "stand_down": boolean,
+  "all_buttons": true | false | null,
+  "button_updates": { "A": true | false , ... optional keys },
+  "reply": string
+}
+
+FIELD GUIDANCE
+- Always include "reply".
+- If the utterance triggers sleep / dismissal / stand down / go to sleep, set stand_down:true and politely confirm in reply.
+- If the utterance adjusts relays, populate all_buttons OR button_updates; otherwise both may be null/empty objects.
+  * all_buttons:null when not relevant.
+  * button_updates:{} when unused.
+  * Only reference keys A,B,C,D.
+- Casual conversation should keep relay fields null/absent besides empty object and stand_down:false.
+- When uncertain, apologize briefly in reply yet keep relays unchanged while narrating ambiguity.
+
+REFERENCE EXAMPLES
+USER: Enable button A → {"stand_down":false,"all_buttons":null,"button_updates":{"A":true},"reply":"Certainly, Sir. Relay Alpha is armed."}
+USER: Toggle off B → {"stand_down":false,"all_buttons":null,"button_updates":{"B":false},"reply":"Relay Bravo disengaged, Sir."}
+USER: Turn on everything → {"stand_down":false,"all_buttons":true,"button_updates":{},"reply":"Acknowledged — all relays energized."}
+
+Keep JSON compact and syntactically perfect.
+`.trim();
+
+/**
+ * @param {readonly ChatTurn[]} history
+ * @param {string} userText
+ * @returns {ChatTurn[]}
+ */
+export function createGroqMessageList(history, userText) {
+  const trimmedUser = `${userText}`.trim();
+  /** @type {ChatTurn[]} */
+  let turns = [...history];
+  /** Cap conversational turns forwarded to Groq */
+  const maxTurns = 12;
+  if (turns.length > maxTurns) {
+    turns = turns.slice(turns.length - maxTurns);
+  }
+
+  return [
+    { role: "system", content: RELAY_PROMPT_BODY },
+    ...turns,
+    trimmedUser.length
+      ? /** @type {ChatTurn} */ ({ role: "user", content: trimmedUser })
+      : /** @type {ChatTurn} */ ({ role: "user", content: "(silence)" }),
+  ];
+}
+
+/**
+ * Normalizes Groq JSON fields into deterministic ParseResult (null preserves buttons).
+ * @param {RelayShape | undefined} relayPayload
+ * @returns {ParseResult | null}
+ */
+export function relayJsonToButtonParse(relayPayload) {
+  if (!relayPayload) return null;
+
+  const all = relayPayload.all_buttons;
+  if (typeof all === "boolean") {
+    return { kind: "all", value: all };
+  }
+
+  const merged = relayPayload.button_updates ?? relayPayload.buttons ?? null;
+  if (!merged || typeof merged !== "object") return null;
+
+  /** @type {Partial<Record<ButtonId, boolean>>} */
+  const normalized = {};
+  LETTERS.forEach((id) => {
+    const lower = /** @type {string} */ (id.toLowerCase());
+    /** @type {unknown} */
+    const val = merged[id];
+    /** @type {unknown} */
+    const lowVal = merged[lower];
+    if (typeof val === "boolean") normalized[id] = val;
+    else if (typeof lowVal === "boolean") normalized[id] = lowVal;
+  });
+
+  return Object.keys(normalized).length
+    ? { kind: "buttons", buttons: normalized }
+    : null;
+}
