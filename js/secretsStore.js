@@ -1,3 +1,5 @@
+import credDefaults from "./credentials.js";
+
 const LS_KEYS = {
   groqApiKey: "jarvis_groq_api_key",
   groqModel: "jarvis_groq_model",
@@ -7,6 +9,67 @@ const LS_KEYS = {
   groqProxyUrl: "jarvis_groq_proxy_url",
   elevenLabsProxyUrl: "jarvis_elevenlabs_proxy_url",
 };
+
+/** @param {Record<string,string>} ex */
+function hasGroqConfigured(ex) {
+  return Boolean(ex.groqApiKey?.trim()) || Boolean(ex.groqProxyUrl?.trim());
+}
+
+/** Groq (API key or proxy) is required once; ElevenLabs is optional (browser TTS otherwise). */
+function setupComplete(surface) {
+  return hasGroqConfigured(surface);
+}
+
+/**
+ * @param {string} g
+ * @param {string} e
+ * @param {string} v
+ */
+function formatSetupPromptDefault(g, e, v) {
+  return [g, e, v].join("|");
+}
+
+/**
+ * @param {string} line
+ * @returns {{ groqApiKey: string, elevenLabsApiKey: string, elevenLabsVoiceId: string }}
+ */
+function parseSetupPipeLine(line) {
+  const parts = `${line ?? ""}`.split("|").map((s) => s.trim());
+  return {
+    groqApiKey: parts[0] ?? "",
+    elevenLabsApiKey: parts[1] ?? "",
+    elevenLabsVoiceId: parts[2] ?? "",
+  };
+}
+
+/** Same merge order as `resolveCredentials` in `aiService.js` (no circular import). */
+function resolveSecretsSurface() {
+  const w =
+    typeof window !== "undefined" && window.JARVIS_CONFIG
+      ? /** @type {Record<string,string>} */ (window.JARVIS_CONFIG)
+      : {};
+  const local = loadSecretsFromLocalStorage();
+  return {
+    groqApiKey: w.groqApiKey ?? local.groqApiKey ?? credDefaults.groqApiKey ?? "",
+    groqProxyUrl:
+      w.groqProxyUrl ?? local.groqProxyUrl ?? credDefaults.groqProxyUrl ?? "",
+    elevenLabsApiKey:
+      w.elevenLabsApiKey ??
+      local.elevenLabsApiKey ??
+      credDefaults.elevenLabsApiKey ??
+      "",
+    elevenLabsVoiceId:
+      w.elevenLabsVoiceId ??
+      local.elevenLabsVoiceId ??
+      credDefaults.elevenLabsVoiceId ??
+      "",
+    elevenLabsProxyUrl:
+      w.elevenLabsProxyUrl ??
+      local.elevenLabsProxyUrl ??
+      credDefaults.elevenLabsProxyUrl ??
+      "",
+  };
+}
 
 /**
  * @returns {{
@@ -66,63 +129,45 @@ export function saveSecretsToLocalStorage(secrets) {
   });
 }
 
-function promptMaybe(label, current) {
-  const input = window.prompt(label, current ?? "");
-  if (input === null) return null;
-  return `${input}`.trim();
-}
-
 /**
- * Prompts the user for keys/voice if missing (or when force=true).
- * Values are stored locally so they won't be committed to GitHub.
+ * One dialog: Groq_key | ElevenLabs_key | Voice_ID (model uses repo default).
+ * Groq is satisfied by api key or groqProxyUrl in LS / credentials / JARVIS_CONFIG.
+ * ElevenLabs optional — leave key & voice empty to use British browser speech instead.
  *
  * @param {{ force?: boolean }} opts
  */
 export async function ensureSecretsPrompt({ force } = {}) {
   const existing = loadSecretsFromLocalStorage();
+  const surface = resolveSecretsSurface();
 
-  const wantGroq = force || !existing.groqApiKey;
-  const wantEleven =
-    force || !existing.elevenLabsApiKey || !existing.elevenLabsVoiceId;
+  if (!force && setupComplete(surface)) {
+    return existing;
+  }
+
+  const def = formatSetupPromptDefault(
+    surface.groqApiKey,
+    surface.elevenLabsApiKey,
+    surface.elevenLabsVoiceId
+  );
+
+  const label = force
+    ? "Update keys — Groq_API_key | ElevenLabs_key | Voice_ID (edit, OK saves non-empty segments only):"
+    : "Jarvis setup (one time) — paste: Groq_API_key | ElevenLabs_key | Voice_ID\nLeave ElevenLabs key & voice empty to use British browser voice only. Groq model stays the default from credentials.";
+
+  const input = window.prompt(label, def);
+  if (input === null) {
+    return existing;
+  }
+
+  const parsed = parseSetupPipeLine(input);
 
   /** @type {Record<string,string>} */
   const updates = {};
-
-  if (wantGroq) {
-    const groqApiKey = promptMaybe(
-      "Paste your Groq API key (starts with gsk_…):",
-      existing.groqApiKey
-    );
-    if (groqApiKey) updates.groqApiKey = groqApiKey;
-
-    const groqModel = promptMaybe(
-      "Groq model (leave blank to use default):",
-      existing.groqModel
-    );
-    if (groqModel) updates.groqModel = groqModel;
-  }
-
-  if (wantEleven) {
-    const elevenLabsApiKey = promptMaybe(
-      "Paste your ElevenLabs API key (xi-api-key):",
-      existing.elevenLabsApiKey
-    );
-    if (elevenLabsApiKey)
-      updates.elevenLabsApiKey = elevenLabsApiKey;
-
-    const elevenLabsVoiceId = promptMaybe(
-      "ElevenLabs VOICE_ID (the voice you want):",
-      existing.elevenLabsVoiceId
-    );
-    if (elevenLabsVoiceId)
-      updates.elevenLabsVoiceId = elevenLabsVoiceId;
-
-    const elevenLabsModelId = promptMaybe(
-      "ElevenLabs TTS model id (optional, e.g. eleven_flash_v2_5):",
-      existing.elevenLabsModelId
-    );
-    if (elevenLabsModelId) updates.elevenLabsModelId = elevenLabsModelId;
-  }
+  if (parsed.groqApiKey) updates.groqApiKey = parsed.groqApiKey;
+  if (parsed.elevenLabsApiKey)
+    updates.elevenLabsApiKey = parsed.elevenLabsApiKey;
+  if (parsed.elevenLabsVoiceId)
+    updates.elevenLabsVoiceId = parsed.elevenLabsVoiceId;
 
   saveSecretsToLocalStorage(updates);
   return loadSecretsFromLocalStorage();

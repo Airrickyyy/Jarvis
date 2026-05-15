@@ -8,10 +8,14 @@
  */
 
 export default {
-  /** Groq API key (starts with gsks_…) */
+  /** Groq API key (starts with gsk_…) */
   groqApiKey: "",
   groqModel: "llama-3.3-70b-versatile",
-  /** ElevenLabs */
+  /**
+   * ElevenLabs — paste a voice_id from Voice Library / Voice Lab.
+   * The MCU "Jarvis" timbre is a specific performance; use a British "narrator / butler"
+   * style voice, or Instant Voice Clone from your own lawful reference audio in ElevenLabs.
+   */
   elevenLabsApiKey: "",
   elevenLabsVoiceId: "",
   elevenLabsModelId: "eleven_flash_v2_5",

@@ -5,10 +5,24 @@ function getRecognitionCtor() {
 }
 
 /**
- * Browser speech synthesis.
+ * Browser speech synthesis (British-leaning fallback when ElevenLabs is off).
  * @param {string} text
  * @returns {Promise<void>}
  */
+/** Picks en-GB when available so the offline fallback matches the "Jarvis" register better. */
+function pickBritishVoice() {
+  const list = speechSynthesis.getVoices();
+  if (!list.length) return null;
+  const enGb = list.filter((v) => v.lang.toLowerCase().startsWith("en-gb"));
+  const maleish = /male|daniel|oliver|thomas|arthur|george|james|william|fred/i;
+  return (
+    enGb.find((v) => maleish.test(v.name)) ||
+    enGb[0] ||
+    list.find((v) => v.lang.toLowerCase().startsWith("en-au")) ||
+    null
+  );
+}
+
 export function speak(text) {
   return new Promise((resolve) => {
     if (!window.speechSynthesis) {
@@ -20,11 +34,26 @@ export function speak(text) {
 
     const u = new SpeechSynthesisUtterance(text);
     u.lang = SPEAK_LANG;
-    u.rate = 1;
+    u.rate = 0.92;
+    u.pitch = 1;
     u.onend = () => resolve();
     u.onerror = () => resolve();
 
-    speechSynthesis.speak(u);
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      const voice = pickBritishVoice();
+      if (voice) u.voice = voice;
+      speechSynthesis.speak(u);
+    };
+
+    if (speechSynthesis.getVoices().length) {
+      start();
+    } else {
+      speechSynthesis.addEventListener("voiceschanged", start, { once: true });
+      window.setTimeout(start, 500);
+    }
   });
 }
 

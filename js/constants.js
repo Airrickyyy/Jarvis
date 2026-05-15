@@ -19,8 +19,9 @@ export const CLAP_NOISE_SMOOTHING = 0.98;
 /** Wake phrase (speech tolerance). */
 export const WAKE_PHRASE_REGEX = /wake\s*(up)?/i;
 
-/** After double-clap, accept “wake up” within this window (ms). */
+/** After double-clap, accept "wake up" within this window (ms). */
 export const WAKE_PHRASE_WINDOW_MS = 7000;
 
 export const RECOG_LANG = "en-US";
-export const SPEAK_LANG = "en-US";
+/** Browser fallback TTS — British reads closer to the "Jarvis" register than en-US. */
+export const SPEAK_LANG = "en-GB";

@@ -193,7 +193,11 @@ export async function speakWithElevenLabsSentences({
   const clean = `${text ?? ""}`.trim();
   if (!clean.length) return;
 
-  if (!secrets.elevenLabsApiKey || !secrets.elevenLabsVoiceId) {
+  const useElDirect =
+    Boolean(secrets.elevenLabsApiKey?.trim()) &&
+    Boolean(secrets.elevenLabsVoiceId?.trim());
+  const useElProxy = Boolean(secrets.elevenLabsProxyUrl?.trim());
+  if (!useElDirect && !useElProxy) {
     await audioCtx.resume();
     await speak(clean);
     return;

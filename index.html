@@ -32,10 +32,11 @@
             Jarvis interface
           </h1>
           <p id="subtitle" class="mt-2 max-w-xl text-sm text-slate-400">
-            Start the uplink → say “wake up jarvis” → conversation mode activates.
-            Populate <code class="rounded bg-black/35 px-1">js/credentials.js</code> (or inject
-            <code class="rounded bg-black/35 px-1">window.JARVIS_CONFIG</code>) with Groq + ElevenLabs
-            secrets before trusting the relays.
+            Start the uplink → one browser prompt for
+            <code class="rounded bg-black/35 px-1">Groq_key | ElevenLabs_key | Voice_ID</code>
+            (ElevenLabs optional). Or set keys in
+            <code class="rounded bg-black/35 px-1">js/credentials.js</code> /
+            <code class="rounded bg-black/35 px-1">window.JARVIS_CONFIG</code>.
           </p>
           <aside
             id="insecureWarning"
