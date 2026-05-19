@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>J.A.R.V.I.S.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<!-- SLEEP SCREEN -->
+<div id="sleepScreen" class="sleep-screen">
+  <div class="sleep-bg-grid"></div>
+  <div class="sleep-center">
+    <div class="sleep-arc">
+      <div class="sleep-arc-ring r1"></div>
+      <div class="sleep-arc-ring r2"></div>
+      <div class="sleep-arc-ring r3"></div>
+      <div class="sleep-arc-core"></div>
+    </div>
+    <div class="sleep-title">J.A.R.V.I.S.</div>
+    <div class="sleep-sub">JUST A RATHER VERY INTELLIGENT SYSTEM</div>
+    <div class="sleep-wake-hint" id="wakeHint">
+      <div class="pulse-dot"></div>
+      <span>SAY <strong>"WAKE UP"</strong> OR <strong>"JARVIS"</strong> TO BEGIN</span>
+    </div>
+    <div class="mic-status" id="micStatus">INITIALIZING MICROPHONE...</div>
+  </div>
+  <div class="sleep-corner tl">SYS::STANDBY</div>
+  <div class="sleep-corner tr" id="sleepClock"></div>
+  <div class="sleep-corner bl">v4.1.7 // GROQ CORE</div>
+  <div class="sleep-corner br">AWAITING VOCAL AUTHORIZATION</div>
+</div>
+
+<!-- MAIN INTERFACE -->
+<div id="mainInterface" class="main-interface hidden">
+  <div class="scanline"></div>
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mark">
+        <div class="logo-arc"><div class="logo-core"></div></div>
+      </div>
+      <div class="logo-text">J.A.R.V.I.S.</div>
+      <div class="system-badge online">● ONLINE</div>
+    </div>
+    <div class="topbar-center">
+      <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="chat" onclick="switchTab('chat')">AI CORE</button>
+        <button class="nav-tab" data-tab="email" onclick="switchTab('email')">EMAIL</button>
+        <button class="nav-tab" data-tab="schedule" onclick="switchTab('schedule')">SCHEDULE</button>
+        <button class="nav-tab" data-tab="brief" onclick="switchTab('brief')">DAILY BRIEF</button>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="clock-display" id="mainClock"></div>
+      <button class="icon-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+      <button class="icon-btn" onclick="goToSleep()" title="Sleep">◐</button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="section-label">SYSTEMS</div>
+        <div class="arc-display">
+          <div class="main-arc">
+            <div class="arc-spin-ring"></div>
+            <div class="arc-ring ar1"></div>
+            <div class="arc-ring ar2"></div>
+            <div class="arc-core"></div>
+          </div>
+          <div class="arc-status-text">OPERATIONAL</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">VOICE</div>
+        <button class="voice-toggle" id="voiceToggle" onclick="toggleListening()">
+          <div class="voice-icon">🎤</div>
+          <div>
+            <div class="voice-label" id="voiceLabel">LISTENING</div>
+            <div class="voice-sub" id="voiceSub">Say anything...</div>
+          </div>
+        </button>
+        <div class="voice-wave" id="voiceWave">
+          <span></span><span></span><span></span><span></span>
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <div class="transcript-box" id="transcriptBox"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">MODULES</div>
+        <button class="mod-btn active" id="modChat" onclick="switchTab('chat')">◈ AI CORE</button>
+        <button class="mod-btn" id="modEmail" onclick="switchTab('email')">✉ EMAIL MGR</button>
+        <button class="mod-btn" id="modSchedule" onclick="switchTab('schedule')">◷ SCHEDULER</button>
+        <button class="mod-btn" id="modBrief" onclick="switchTab('brief')">◎ DAILY BRIEF</button>
+      </div>
+    </aside>
+
+    <!-- MAIN PANEL -->
+    <section class="main-panel">
+
+      <!-- CHAT TAB -->
+      <div class="tab-content active" id="tab-chat">
+        <div class="chat-history" id="chatHistory"></div>
+        <div class="chat-input-area">
+          <div class="input-row">
+            <input type="text" class="chat-input" id="chatInput"
+              placeholder="ENTER COMMAND OR SPEAK..."
+              onkeydown="if(event.key==='Enter')sendMessage()"/>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">TRANSMIT</button>
+          </div>
+          <div class="input-hint">Voice activated · Say "JARVIS" at any time to refocus</div>
+        </div>
+      </div>
+
+      <!-- EMAIL TAB -->
+      <div class="tab-content" id="tab-email">
+        <div class="module-header">
+          <div class="module-title">EMAIL MANAGEMENT</div>
+          <button class="module-action-btn" onclick="askJarvisAbout('Scan my emails and give me a summary of what needs attention today.')">◈ SCAN INBOX</button>
+        </div>
+        <div class="connect-prompt">
+          <div class="connect-icon">✉</div>
+          <div class="connect-title">EMAIL MODULE</div>
+          <div class="connect-desc">Connect your Gmail or Outlook to let JARVIS manage your inbox, draft replies, and flag urgent messages.</div>
+          <button class="connect-btn" onclick="askJarvisAbout('Tell me how to connect my email to JARVIS.')">CONNECT ACCOUNT ↗</button>
+        </div>
+      </div>
+
+      <!-- SCHEDULE TAB -->
+      <div class="tab-content" id="tab-schedule">
+        <div class="module-header">
+          <div class="module-title">SCHEDULE & PLANNING</div>
+          <button class="module-action-btn" onclick="askJarvisAbout('Plan out my day and help me optimize my schedule.')">◈ PLAN MY DAY</button>
+        </div>
+        <div class="connect-prompt">
+          <div class="connect-icon">◷</div>
+          <div class="connect-title">CALENDAR MODULE</div>
+          <div class="connect-desc">Connect Google Calendar or Outlook to let JARVIS view your schedule, suggest optimizations, and plan your day.</div>
+          <button class="connect-btn" onclick="askJarvisAbout('How can I connect my calendar to JARVIS?')">CONNECT CALENDAR ↗</button>
+        </div>
+      </div>
+
+      <!-- BRIEF TAB -->
+      <div class="tab-content" id="tab-brief">
+        <div class="module-header">
+          <div class="module-title">DAILY BRIEFING</div>
+          <button class="module-action-btn" onclick="askJarvisAbout('Give me a comprehensive daily briefing including weather, news, tasks, and schedule.')">◈ RUN BRIEFING</button>
+        </div>
+        <div class="brief-content">
+          <div class="connect-prompt">
+            <div class="connect-icon">◎</div>
+            <div class="connect-title">DAILY BRIEF</div>
+            <div class="connect-desc">JARVIS will compile your emails, calendar, tasks, and news into a personalized morning briefing.</div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT SIDEBAR -->
+    <aside class="right-sidebar">
+      <div class="section-label">METRICS</div>
+      <div class="metric-card">
+        <div class="metric-label">EMAILS</div>
+        <div class="metric-value" id="mv-emails">—</div>
+        <div class="metric-sub">unread</div>
+        <div class="metric-bar"><div class="metric-fill" id="mf-emails" style="width:0%"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">MEETINGS</div>
+        <div class="metric-value" id="mv-meetings">—</div>
+        <div class="metric-sub">today</div>
+        <div class="metric-bar"><div class="metric-fill" id="mf-meetings" style="width:0%"></div></div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">TASKS</div>
+        <div class="metric-value" id="mv-tasks">—</div>
+        <div class="metric-sub">pending</div>
+        <div class="metric-bar"><div class="metric-fill" id="mf-tasks" style="width:0%"></div></div>
+      </div>
+
+      <div class="section-label" style="margin-top:16px">ALERTS</div>
+      <div class="alert-list" id="alertList">
+        <div class="alert-item muted">SYSTEM BOOTING...</div>
+      </div>
+
+      <div class="section-label" style="margin-top:16px">AI STATUS</div>
+      <div class="ai-status-card">
+        <div class="ai-status-row"><span>CORE</span><span class="badge green">ACTIVE</span></div>
+        <div class="ai-status-row"><span>VOICE IN</span><span class="badge green" id="voiceInBadge">LISTENING</span></div>
+        <div class="ai-status-row"><span>VOICE OUT</span><span class="badge green" id="voiceOutBadge">READY</span></div>
+        <div class="ai-status-row"><span>EMAIL</span><span class="badge amber">PENDING</span></div>
+        <div class="ai-status-row"><span>CALENDAR</span><span class="badge amber">PENDING</span></div>
+      </div>
+    </aside>
+
+  </main>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="settings-overlay hidden" id="settingsOverlay" onclick="if(event.target===this)toggleSettings()">
+  <div class="settings-panel">
+    <div class="settings-header">
+      <div class="settings-title">SYSTEM CONFIGURATION</div>
+      <button class="settings-close" onclick="toggleSettings()">✕</button>
+    </div>
+    <div class="settings-body">
+      <div class="setting-group">
+        <label class="setting-label">GROQ API KEY</label>
+        <input type="password" class="setting-input" id="apiKeyInput" placeholder="gsk_..."/>
+        <div class="setting-hint">Required for AI responses. Free at console.groq.com/keys</div>
+      </div>
+      <div class="setting-group">
+        <label class="setting-label">GROQ MODEL</label>
+        <input type="text" class="setting-input" id="groqModelInput" placeholder="llama-3.3-70b-versatile"/>
+        <div class="setting-hint">Recommended: llama-3.3-70b-versatile · Fast: llama-3.1-8b-instant</div>
+      </div>
+      <div class="setting-group">
+        <label class="setting-label">ELEVENLABS API KEY (optional)</label>
+        <input type="password" class="setting-input" id="elevenLabsInput" placeholder="For high-quality JARVIS voice..."/>
+        <div class="setting-hint">Optional. Uses browser TTS if not provided. Get at elevenlabs.io</div>
+      </div>
+      <div class="setting-group">
+        <label class="setting-label">ELEVENLABS VOICE ID (optional)</label>
+        <input type="text" class="setting-input" id="voiceIdInput" placeholder="Default: Adam voice"/>
+        <div class="setting-hint">Find voice IDs in your ElevenLabs dashboard</div>
+      </div>
+      <div class="setting-group">
+        <label class="setting-label">YOUR NAME</label>
+        <input type="text" class="setting-input" id="userNameInput" placeholder="Sir"/>
+        <div class="setting-hint">How JARVIS will address you</div>
+      </div>
+      <div class="setting-group">
+        <label class="setting-label">WAKE WORDS</label>
+        <input type="text" class="setting-input" id="wakeWordsInput" placeholder="wake up, jarvis, hey jarvis"/>
+        <div class="setting-hint">Comma-separated. System activates on any of these phrases.</div>
+      </div>
+      <button class="save-btn" onclick="saveSettings()">SAVE CONFIGURATION</button>
+      <div class="save-status" id="saveStatus"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SPEAKING INDICATOR -->
+<div class="speaking-indicator hidden" id="speakingIndicator">
+  <div class="speaking-wave">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+  <span>JARVIS SPEAKING</span>
+</div>
+
+<script src="js/jarvis.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "jarvis",
+  "version": "1.0.0",
+  "description": "1. Open `index.html` in Chrome or Edge (required for voice) 2. Click the ? settings icon and enter your API key(s) 3. Allow microphone access when prompted 4. Say **\"Wake up\"** or **\"Jarvis\"** to boot the system",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "vite": "^8.0.13"
+  }
+}
