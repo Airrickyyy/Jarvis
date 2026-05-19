@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # J.A.R.V.I.S. — Setup Guide
 
 ## Quick Start
@@ -75,3 +76,6 @@ Edit `css/style.css` to change colors:
 - Daily briefing with real data
 - Weather module
 - News briefing
+=======
+# JARVIS
+>>>>>>> 88d08facd677a64932923d8e7c06d492cd978d07
